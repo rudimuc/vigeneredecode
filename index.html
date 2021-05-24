@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/amcharts/3.21.15/amcharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/amcharts/3.21.15/serial.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/amcharts/3.21.15/plugins/export/export.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/amcharts/3.21.15/plugins/dataloader/dataloader.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/amcharts/3.21.15/plugins/export/export.css" type="text/css" media="all" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/amcharts/3.21.15/themes/light.js"></script>
+
+    <title>JS Vigenere Decryption</title>
+  </head>
+  <body>
+
+    <div class="container">
+      <div class="row">
+        <div class="col-sm">
+          <div class="card mb-3">
+            <div class="card-body">
+              This page lets you work on an encoded text. You can analyse it's distribution, decipher it and crack the password.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-sm-6">
+          <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Coded Text</span>
+            </div>
+            <textarea id="codedtext" name="codedtext" class="form-control" rows="10" aria-label="Coded Text"></textarea>
+          </div>
+
+          <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <span class="input-group-text" id="addon-wrapping">Password</span>
+            </div>
+            <input id="password" name="password" type="text" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="addon-wrapping">
+          </div>
+
+          <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <span class="input-group-text" id="addon-wrapping">Max Length to check</span>
+            </div>
+            <input id="maxpasswordlen" name="maxpasswordlen" type="text" class="form-control" placeholder="Password length" aria-label="Password length" aria-describedby="addon-wrapping">
+          </div>
+
+          <div class="mb-3">
+            <label class="mr-sm-2 sr-only" for="inlineFormCustomSelect">Preference</label>
+            <select class="custom-select mr-sm-2" id="inlineFormCustomSelect">
+              <option selected value="de">Deutsch</option>
+              <option value="en">English</option>
+              <option value="sk">Slovenčina</option>
+            </select>
+          </div>
+
+          <button type="button" class="btn btn-dark" onclick="javascript:decode();">Decode</button>
+          <button type="button" class="btn btn-dark" onclick="javascript:crack();">Crack Password</button>
+          <button type="button" class="btn btn-dark" onclick="javascript:analyze('codedtext');">Analyse encoded text</button>
+        </div>
+        <div class="col-sm-6">
+          <div class="card mb-3">
+            <div class="card-body">
+              Distribution Analysis Chart Window
+              <div id="chart2" style="height: 400px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-sm-12">
+          <div class="input-group mb-3">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Plain Text</span>
+            </div>
+            <textarea id="plaintext" name="plaintext" class="form-control" rows="10" aria-label="Plain Text"></textarea>
+          </div>
+
+          <button type="button" class="btn btn-dark" onclick="javascript:analyze('plaintext');">Analyse plain text</button>
+          <button type="button" class="btn btn-dark" onclick="javascript:code();">Code plain text</button>
+        </div>
+      </div>
+    </div>
+
+
+
+
+<script language="javascript">
+
+    // Define the standarddistributions for each letters A to Z in different languages
+    //          A          B         C         D         E         F         G         H         I         J         K          L          M          N          O          P          Q          R          S          T          U          V          W          X          Y          Z
+    var standarddistributions = {
+        "de": { 0:  6.51,  1:  1.89, 2:  3.06, 3:  5.08, 4: 17.40, 5:  1.66, 6:  3.01, 7:  4.76, 8:  7.55, 9:  0.27, 10:  1.21, 11:  3.44, 12:  2.53, 13:  9.78, 14:  2.51, 15:  0.79, 16:  0.02, 17:  7.00, 18:  7.27, 19:  6.15, 20:  4.35, 21:  0.67, 22:  1.89, 23:  0.03, 24:  0.04, 25:  1.13 },
+        "en": { 0:  8.17,  1:  1.49, 2:  2.78, 3:  4.25, 4: 12.70, 5:  2.23, 6:  2.01, 7:  6.09, 8:  6.97, 9:  0.15, 10:  0.77, 11:  4.02, 12:  2.41, 13:  6.74, 14:  7.51, 15:  1.93, 16:  0.10, 17:  5.99, 18:  6.33, 19:  9.06, 20:  2.76, 21:  0.98, 22:  2.36, 23:  0.15, 24:  1.97, 25:  0.07 },
+        "sk": { 0: 11.39,  1:  1.42, 2:  3.63, 3:  3.14, 4:  8.50, 5:  0.44, 6:  0.25, 7:  2.02, 8:  7.95, 9:  2.04, 10:  4.07, 11:  4.70, 12:  4.15, 13:  6.09, 14:  8.80, 15:  2.92, 16:  0.00, 17:  5.41, 18:  5.55, 19:  5.16, 20:  3.20, 21:  3.91, 22:  0.00, 23:  0.00, 24:  2.40, 25:  2.84 }
+    };
+
+    /**
+     * Rotates the list
+     * @param list
+     * @returns {Array}
+     */
+    function rotateList(list) {
+        var newlist = [];
+        for(var i = 1; i < 26; i++) {
+            newlist[i] = list[i-1];
+        }
+        newlist[0] = list[25];
+        return newlist;
+    }
+
+    function code() {
+        var pass = filterKey($("#password").val());
+        var plain = $("#plaintext").val();
+
+        if (pass.length === 0) {
+            alert("Password is invalid");
+            return;
+        }
+
+        for (var i = 0; i < pass.length; i++)
+            pass[i] = (26 - pass[i]) % 26;
+
+        $("#codedtext").val(crypt(plain, pass));
+    }
+
+    function decode() {
+        var pass = filterKey($("#password").val());
+        var coded = $("#codedtext").val();
+
+        if (pass.length === 0) {
+            alert("Password is invalid");
+            return;
+        }
+
+        for (var i = 0; i < pass.length; i++)
+            pass[i] = (26 - pass[i]) % 26;
+
+        $("#plaintext").val(decrypt(coded, pass));
+    }
+
+    function crypt(input, key) {
+        var output = "";
+        for (var i = 0, j = 0; i < input.length; i++) {
+            var c = input.charCodeAt(i);
+            if (isUppercase(c)) {
+                output += String.fromCharCode((c - 65 + 26 - key[j % key.length]) % 26 + 65);
+                j++;
+            } else if (isLowercase(c)) {
+                output += String.fromCharCode((c - 97 + 26 - key[j % key.length]) % 26 + 97);
+                j++;
+            } else {
+                output += input.charAt(i);
+            }
+        }
+        return output;
+    }
+
+    function decrypt(input, key) {
+        var output = "";
+        for (var i = 0, j = 0; i < input.length; i++) {
+            var c = input.charCodeAt(i);
+            if (isUppercase(c)) {
+                output += String.fromCharCode((c - 65 + key[j % key.length]) % 26 + 65);
+                j++;
+            } else if (isLowercase(c)) {
+                output += String.fromCharCode((c - 97 + key[j % key.length]) % 26 + 97);
+                j++;
+            } else {
+                output += input.charAt(i);
+            }
+        }
+        return output;
+    }
+
+    function filterKey(key) {
+        var result = [];
+        for (var i = 0; i < key.length; i++) {
+            var c = key.charCodeAt(i);
+            if (isLetter(c))
+                result.push((c - 65) % 32);
+        }
+        return result;
+    }
+
+    function filterText(text) {
+        var result = "";
+        for (var i = 0; i < text.length; i++) {
+            var c = text.charCodeAt(i);
+            if (isLetter(c))
+                result = result + String.fromCharCode(c);
+        }
+        return result;
+    }
+
+    /**
+     *
+     * @param arr1
+     * @param arr2
+     * @returns {number}
+     */
+    function multiply(arr1, arr2) {
+        var result = 0;
+        for (var i = 0; i < 26; i++) {
+            result += arr1[i] * arr2[i];
+        }
+        return result;
+    }
+
+    /**
+     * is the character a letter?
+     * @param c
+     * @returns {*}
+     */
+    function isLetter(c) {
+        return isUppercase(c) || isLowercase(c);
+    }
+
+    /**
+     * is the char between A-Z?
+     * @param c
+     * @returns {boolean}
+     */
+    function isUppercase(c) {
+        return 65 <= c && c <= 90;  // 65 is character code for 'A'. 90 is 'Z'.
+    }
+
+    /**
+     * is the char between a-z?
+     * @param c
+     * @returns {boolean}
+     */
+    function isLowercase(c) {
+        return 97 <= c && c <= 122;  // 97 is character code for 'a'. 122 is 'z'.
+    }
+
+    /**
+     * counts from a given [text] every character - starting at [offset] and every [delta]th char.
+     * Returns an array [0-25] with percentage of each char in text (range: 0.0 - 1.0).
+     * @param text
+     * @param offset
+     * @param delta
+     * @returns {Array}
+     */
+    function countChars(text, offset, delta) {
+        // Array counts the chars (a-z / index 0-25)
+        var result = [];
+        for(var x = 0; x < 26; x++) {
+            result[x] = 0;
+        }
+        var counter = 0;
+
+        for (var i = 0+offset; i < text.length; i+=delta) {
+            var j = text.charCodeAt(i);
+            if(isLetter(j)) {
+                // Count total amount of chars, which are letters.
+                counter++;
+                // Count the occurances of specific chars. a=97 / A=65
+                result[j%32-1] = result[j%32-1]+1;
+            }
+        }
+
+        // in the end, normalize the specific char-counts to a percentage between 0 and 1.
+        for(var x = 97; x < 97+26; x++) {
+            result[x-97] = result[x-97]/counter*100;
+        }
+
+        return result;
+    }
+
+    function analyze(name) {
+
+        var text = $("#"+name).val();
+
+        var dataArray = [];
+
+        var textfiltered = filterText(text);
+        var result = countChars(textfiltered, 0, 1);
+
+        for(var i = 65; i < 65+26; i++) {
+            dataArray.push({
+                "object": String.fromCharCode(i),
+                "count": result[i%32-1]
+            });
+        }
+
+        // Render the chart for the given distribution
+        AmCharts.makeChart( "chart2", {
+            "type": "serial",
+            "theme": "light",
+            "thousandsSeparator": ".",
+            "decimalSeparator": ",",
+            "dataProvider": dataArray,
+            "valueAxes": [ {
+                "gridColor": "#FFFFFF",
+                "gridAlpha": 0.2,
+                "dashLength": 0,
+                "minimum": 0,
+                "maximum": 25,
+                "unit": "%"
+            } ],
+            "gridAboveGraphs": true,
+            "startDuration": 0,
+            "graphs": [ {
+                "balloonText": "[[category]]: <b>[[value]]%</b>",
+                "fillAlphas": 0.8,
+                "lineAlpha": 0.2,
+                "type": "column",
+                "valueField": "count",
+                "precision": 2
+            } ],
+            "chartCursor": {
+                "categoryBalloonEnabled": false,
+                "cursorAlpha": 0,
+                "zoomable": false
+            },
+            "categoryField": "object",
+            "categoryAxis": {
+                "gridPosition": "start",
+                "gridAlpha": 0,
+                "tickPosition": "start",
+                "tickLength": 20
+            },
+            "export": {
+                "enabled": true
+            }
+
+        } );
+    }
+
+    /** 
+     * Try to crack the password
+     */
+    function crack() {
+        var text = filterText($("#codedtext").val());
+
+        var maxCheckLength = Number.parseInt($("#maxpasswordlen").val());
+        if(!Number.isInteger(maxCheckLength) || maxCheckLength < 1) {
+            alert("Please enter a positive number for the maximum password chars you want to check");
+            return;
+        }
+        
+        var bestdelta = getBestDelta(text, maxCheckLength);
+
+        var password = "";
+        for(var i = 1; i <= bestdelta; i++) {
+            var shift = getBestShift(text, i-1, bestdelta, false);
+            password = password + String.fromCharCode(65+shift);
+        }
+        alert("The password is: "+password);
+        $("#password").val(password);
+
+    }
+
+    /**
+     * find the best Delta - best Delta means: where is the best match of standard distributions found?
+     */
+    function getBestDelta(text, maxPasswordChars) {
+        var maxNumber = 0;
+        var maxDelta = 0;
+
+        for(var i = 1; i <= maxPasswordChars; i++) {
+            var ret = getBestShift(text, 0, i, true);
+            if(ret > maxNumber) {
+                maxNumber = ret;
+                maxDelta = i;
+            }
+        }
+
+        return maxDelta;
+    }
+
+    /**
+     * Find the best match of standard distribution to the current shifted try
+     */
+    function getBestShift(text, offset, delta, getnumber) {
+        var maxNumber = 0;
+        var maxShift = 0;
+
+        var list = standarddistributions[$("#inlineFormCustomSelect option:selected").val()];
+
+        var result = countChars(text, offset, delta);
+
+        for(var i = 0; i < 26; i++) {
+            var ret = multiply(list, result);
+            if(ret > maxNumber) {
+                maxNumber = ret;
+                maxShift = i;
+            }
+            list = rotateList(list);
+        }
+
+        if(getnumber)
+            return maxNumber;
+        else
+            return maxShift;
+    }
+
+</script>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  </body>
+</html>
